@@ -26,7 +26,7 @@ async function init() {
 
   if (storedUser) {
     userChip.textContent = `${storedUser.fullName} · ${storedUser.roleNames?.[0] || storedUser.roles?.[0] || ''}`;
-    if ((storedUser.roles || []).some((r) => ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'].includes(r))) {
+    if ((storedUser.roles || []).some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'].includes(r))) {
       document.getElementById('navAdmin').classList.remove('d-none');
     }
   }

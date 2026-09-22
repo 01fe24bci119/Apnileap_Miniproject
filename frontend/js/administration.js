@@ -1,4 +1,4 @@
-const ADMIN_ROLES = ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'];
+const ADMIN_ROLES = ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'];
 const DEPARTMENT_SCOPED_ROLES = ['DEAN_PRINCIPAL', 'DEPARTMENT_HEAD'];
 let currentUser;
 let userModal, instituteModal, confirmModal, departmentModal, accessModal;
@@ -23,7 +23,7 @@ function clearFormError(id) {
 }
 
 function isPlatformAdmin() {
-  return (currentUser?.roles || []).includes('PLATFORM_ADMIN');
+  return (currentUser?.roles || []).some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER'].includes(r));
 }
 
 // ---------- Users: search ----------
@@ -412,7 +412,7 @@ async function loadDepartments() {
   const instituteId = document.getElementById('deptInstituteSelect').value;
   const tbody = document.getElementById('departmentsBody');
   if (!instituteId) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Select an institute.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Select an institute.</td></tr>';
     return;
   }
   try {
@@ -420,16 +420,15 @@ async function loadDepartments() {
     departmentCache[instituteId] = departments;
     tbody.innerHTML = departments.length ? departments.map((d) => `
       <tr>
-        <td>${esc(d.code)}</td>
         <td>${esc(d.name)}</td>
         <td>${d.head_name ? esc(d.head_name) : '<span class="text-muted">Not assigned</span>'}</td>
         <td class="text-end">${esc(d.project_count)}</td>
         <td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-secondary me-1" data-edit-dept="${esc(d.id)}">Edit</button><button class="btn btn-sm btn-outline-danger" data-delete-dept="${esc(d.id)}">Delete</button></td>
-      </tr>`).join('') : '<tr><td colspan="5" class="text-muted">No departments yet.</td></tr>';
+      </tr>`).join('') : '<tr><td colspan="4" class="text-muted">No departments yet.</td></tr>';
     tbody.querySelectorAll('[data-edit-dept]').forEach((btn) => btn.addEventListener('click', () => openDepartmentModal(departments.find((x) => String(x.id) === btn.dataset.editDept))));
     tbody.querySelectorAll('[data-delete-dept]').forEach((btn) => btn.addEventListener('click', () => deleteDepartment(departments.find((x) => String(x.id) === btn.dataset.deleteDept))));
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-danger">${esc(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="text-danger">${esc(err.message)}</td></tr>`;
   }
 }
 

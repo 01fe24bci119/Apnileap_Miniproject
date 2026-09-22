@@ -111,8 +111,8 @@
         </div>
         <div class="table-responsive">
           <table class="table al-table">
-            <thead><tr><th>Code (automatic)</th><th>Name</th><th>Department Head</th><th class="text-end">Projects</th><th></th></tr></thead>
-            <tbody id="departmentsBody"><tr><td colspan="5" class="text-muted">Select an institute.</td></tr></tbody>
+            <thead><tr><th>Name</th><th>Department Head</th><th class="text-end">Projects</th><th></th></tr></thead>
+            <tbody id="departmentsBody"><tr><td colspan="4" class="text-muted">Select an institute.</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -220,8 +220,7 @@
       <div class="modal-header"><h5 class="modal-title" id="departmentModalTitle">Add Department</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <form id="departmentForm">
-          <div class="mb-2"><label class="form-label" for="departmentName">Department Name</label><input class="form-control" id="departmentName" maxlength="200" autocomplete="off" required>
-            <div class="form-text">The department ID and code are assigned automatically.</div></div>
+          <div class="mb-2"><label class="form-label" for="departmentName">Department Name</label><input class="form-control" id="departmentName" maxlength="200" autocomplete="off" required></div>
           <div class="mb-2"><label class="form-label" for="departmentHead">Department Head Name</label>
             <input class="form-control" id="departmentHead" list="departmentHeadList" maxlength="200" autocomplete="off" placeholder="Type the Head's name">
             <datalist id="departmentHeadList"></datalist>

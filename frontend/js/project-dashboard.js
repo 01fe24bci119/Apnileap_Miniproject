@@ -97,11 +97,14 @@ function applyRoleVisibility() {
   const btnAddLink2 = document.getElementById('btnAddLink2');
   if (btnAddLink2) btnAddLink2.classList.toggle('d-none', !mentorUp);
 
+  // Edit project details and team details: ONLY for Faculty Guide, Students, HOD, Platform Administrator
+  const canEditDetailsAndTeam = isGuide || isStudent || isHod || isAdmin;
+
   const btnEditTeam = document.getElementById('btnEditTeam');
-  if (btnEditTeam) btnEditTeam.classList.toggle('d-none', !mentorUp);
+  if (btnEditTeam) btnEditTeam.classList.toggle('d-none', !canEditDetailsAndTeam);
 
   const btnEditDetails = document.getElementById('btnEditDetails');
-  if (btnEditDetails) btnEditDetails.classList.toggle('d-none', !mentorUp);
+  if (btnEditDetails) btnEditDetails.classList.toggle('d-none', !canEditDetailsAndTeam);
 }
 
 // Overview | Assessment | Project Tracking. Project Tracking holds seven sections
@@ -153,7 +156,8 @@ function renderHeader() {
   const roles = storedUser?.roles || [];
   const isFacultyOnly = roles.includes('FACULTY_MENTOR') &&
     !roles.some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN', 'DEAN_PRINCIPAL', 'DEPARTMENT_HEAD', 'REVIEWER'].includes(r));
-  const isDean = roles.includes('DEAN_PRINCIPAL');
+  const isDean = roles.includes('DEAN_PRINCIPAL') || roles.includes('READ_ONLY_STAKEHOLDER') || roles.includes('REVIEWER');
+  const hideStatus = roles.includes('READ_ONLY_STAKEHOLDER') || roles.includes('REVIEWER');
 
   if (Student.isStudent()) {
     document.getElementById('breadcrumb').textContent =
@@ -195,13 +199,25 @@ function renderHeader() {
 
   document.getElementById('projectTitle').textContent = currentProject.title;
   document.getElementById('projectMeta').innerHTML = `
-    <span><strong>${esc(currentProject.project_code)}</strong></span>
+    <span class="badge bg-secondary-subtle text-secondary-emphasis border">${esc(currentProject.project_code)}</span>
     <span class="text-muted">Team ID: <strong>${esc(currentProject.team_id)}</strong></span>
     <span class="text-muted">Artefact ID: <strong>${esc(currentProject.artefact_id)}</strong></span>
     <span class="text-muted">Faculty Mentor: ${esc(currentProject.mentor_name) || 'Unassigned'}</span>
     <span class="text-muted">Next review: ${formatDate(currentProject.next_review_at)}</span>
   `;
-  document.getElementById('ragBadgeWrap').innerHTML = ragDot(currentProject.rag_status, 'lg');
+  const ragWrap = document.getElementById('ragBadgeWrap');
+  if (ragWrap) {
+    if (hideStatus) {
+      ragWrap.classList.add('d-none');
+    } else {
+      ragWrap.classList.remove('d-none');
+      ragWrap.innerHTML = ragDot(currentProject.rag_status, 'lg');
+    }
+  }
+  const statusHistoryCard = document.getElementById('statusHistoryCard');
+  if (statusHistoryCard) {
+    statusHistoryCard.classList.toggle('d-none', hideStatus);
+  }
   document.getElementById('completionLabel').textContent = `${currentProject.completion_pct}%`;
   document.getElementById('completionBar').style.width = `${esc(currentProject.completion_pct)}%`;
 
@@ -873,7 +889,7 @@ async function init() {
   const userChip = document.getElementById('userChip');
   if (currentUser) {
     userChip.textContent = `${currentUser.fullName} · ${currentUser.roleNames?.[0] || currentUser.roles?.[0] || ''}`;
-    if ((currentUser.roles || []).some((r) => ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'].includes(r))) {
+    if ((currentUser.roles || []).some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'].includes(r))) {
       document.getElementById('navAdmin').classList.remove('d-none');
     }
   }

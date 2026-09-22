@@ -37,14 +37,21 @@
     </div>
   </div>
 
+  <!-- Institute summary (for Admins) -->
+  <div class="al-card d-none mb-3" id="instituteSummaryCard">
+    <h2 class="mb-3 fs-5 fw-bold">Institute Summary</h2>
+    <div class="row g-3" id="instituteGrid">
+      <div class="col-12 text-muted">Loading institutes…</div>
+    </div>
+  </div>
 
   <!-- Dean View: Department Choice Boxes (Primary default view for Dean) -->
   <div id="deanView" class="d-none mb-4">
     <div class="al-card mb-3">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <h2 class="mb-1 fs-5 fw-bold">Select Department</h2>
-          <p class="text-muted mb-0" style="font-size:13.5px">Select a department under your oversight to explore its project themes and mini-projects.</p>
+          <h2 class="mb-1 fs-5 fw-bold" id="deptChoiceTitle">Select Department</h2>
+          <p class="text-muted mb-0" id="deptChoiceSubtitle" style="font-size:13.5px">Select a department to explore its project themes and mini-projects.</p>
         </div>
       </div>
       <div class="row g-3" id="deanDepartmentGrid">
@@ -57,12 +64,6 @@
   <!-- HOD View: Themes under his department (Primary default view for HOD) -->
   <div id="hodView" class="d-none mb-4">
     <div class="al-card mb-3">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h2 class="mb-1 fs-5 fw-bold" id="hodDeptTitle">Department Themes</h2>
-          <p class="text-muted mb-0" style="font-size:13.5px" id="hodDeptSubtitle">Select a theme to view its mini-projects.</p>
-        </div>
-      </div>
       <div class="row g-3" id="hodThemeGrid">
         <div class="col-12 text-muted">Loading themes…</div>
       </div>
@@ -114,12 +115,6 @@
         <div class="d-flex align-items-center gap-2">
           <span class="badge bg-primary-subtle text-primary-emphasis border" id="projectCountBadge">0 Projects</span>
         </div>
-        <div class="d-flex flex-wrap align-items-center gap-3">
-          <span class="d-flex align-items-center gap-1"><span class="al-rag-dot rag-green"></span> Green: <strong id="statGreen">0</strong></span>
-          <span class="d-flex align-items-center gap-1"><span class="al-rag-dot rag-yellow"></span> Yellow: <strong id="statYellow">0</strong></span>
-          <span class="d-flex align-items-center gap-1"><span class="al-rag-dot rag-red"></span> Red: <strong id="statRed">0</strong></span>
-          <span class="text-muted">Avg: <strong id="statAvg" class="text-dark">0%</strong></span>
-        </div>
       </div>
     </div>
 
@@ -132,7 +127,7 @@
               <th style="min-width: 250px;">Project & Artefact</th>
               <th style="min-width: 150px;">Department & Theme</th>
               <th style="min-width: 130px;" id="thMentor">Faculty Mentor</th>
-              <th style="min-width: 95px;">Status</th>
+              <th style="min-width: 95px;" id="thStatus">Status</th>
               <th style="min-width: 120px;">Progress</th>
               <th style="min-width: 110px;">Next Review</th>
               <th class="text-end" style="min-width: 220px;">Actions</th>

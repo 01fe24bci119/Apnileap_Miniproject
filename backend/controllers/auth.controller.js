@@ -63,6 +63,16 @@ async function login(req, res, next) {
             const { rows: teamRows } = await pool.query(`SELECT DISTINCT project_id FROM project_students WHERE srn = $1`, [user.srn]);
             projectIds = teamRows.map((r) => r.project_id);
         }
+        if (roleRows.some((r) => r.code === 'FACULTY_MENTOR')) {
+            const { rows: mentorRows } = await pool.query(
+                `SELECT DISTINCT id FROM projects
+                 WHERE (mentor_user_id = $1 OR lower(trim(faculty_mentor_name)) = lower(trim($2)))
+                   AND is_active = TRUE`,
+                [user.id, user.full_name]
+            );
+            const mentorPids = mentorRows.map((r) => r.id);
+            projectIds = [...new Set([...projectIds, ...mentorPids])];
+        }
         const studentOnly = roleRows.length > 0 && roleRows.every((r) => r.code === 'STUDENT');
 
         res.json({

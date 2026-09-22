@@ -17,7 +17,7 @@ const ROLES = [
 ];
 
 const INSTITUTES = [
-    ['KLE', 'KLE Technological University'],
+    ['KLE', 'KLE Technological University (Hubballi Campus)'],
     ['MMCOE', 'Marathwada Mitra Mandal College of Engineering'],
     ['RIT', 'Rajarambapu Institute of Technology'],
     ['COEP', 'College of Engineering, Pune'],
@@ -263,6 +263,7 @@ async function seed() {
                 }
             }
         }
+    }
         console.log('Sample projects seeded:', projectSeq - 1);
 
         // KLE's second CSE department: two demo projects, only if it has none.

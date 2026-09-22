@@ -67,11 +67,19 @@ const DEFINITION_FIELDS = [
 // PUT /api/projects/:projectId
 async function updateProject(req, res, next) {
     try {
-        if (isStudentOnly(req.user)) {
-            const disallowed = Object.keys(req.body || {}).filter((k) => !DEFINITION_FIELDS.includes(k));
-            if (disallowed.length > 0) {
-                return res.status(403).json({ error: 'Students may only update project definition fields.' });
-            }
+        const roles = req.user?.roles || [];
+        const isPlatformAdmin = roles.includes('PLATFORM_ADMIN');
+        const isHod = roles.includes('DEPARTMENT_HEAD') && (req.user.departmentIds || []).includes(req.project.department_id);
+        const isGuide = roles.includes('FACULTY_MENTOR') && (
+            (req.project.mentor_user_id && req.project.mentor_user_id === req.user.id) ||
+            (req.user.fullName && req.project.faculty_mentor_name &&
+             req.project.faculty_mentor_name.trim().toLowerCase() === req.user.fullName.trim().toLowerCase()) ||
+            (req.user.projectIds || []).includes(req.project.id)
+        );
+        const isStudent = roles.includes('STUDENT') && (req.user.projectIds || []).includes(req.project.id);
+
+        if (!isPlatformAdmin && !isHod && !isGuide && !isStudent) {
+            return res.status(403).json({ error: 'Only the faculty guide, project team students, HOD, or Platform Administrator can update project details.' });
         }
 
         const updates = [];

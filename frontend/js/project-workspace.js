@@ -4,6 +4,7 @@ let currentUser;
 let taskModal;
 let loadedTasks = [];
 let teamMembers = [];
+let canCreateTask = false;
 
 function getProjectId() {
   const urlParam = new URLSearchParams(window.location.search).get('id');
@@ -49,7 +50,7 @@ function renderBreadcrumb() {
   const roles = storedUser?.roles || [];
   const isFacultyOnly = roles.includes('FACULTY_MENTOR') &&
     !roles.some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN', 'DEAN_PRINCIPAL', 'DEPARTMENT_HEAD', 'REVIEWER'].includes(r));
-  const isDean = roles.includes('DEAN_PRINCIPAL');
+  const isDean = roles.includes('DEAN_PRINCIPAL') || roles.includes('READ_ONLY_STAKEHOLDER') || roles.includes('REVIEWER');
 
   if (Student.isStudent()) {
     document.getElementById('breadcrumb').textContent =
@@ -145,28 +146,40 @@ function renderColumn(containerId, tasks, columnStatus) {
     const priorityClass = t.priority === 'HIGH' ? 'priority-high' : t.priority === 'LOW' ? 'priority-low' : 'priority-medium';
 
     let moveButtons = '';
-    if (columnStatus === 'TODO') {
-      moveButtons = `
-        <button class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:11.5px" data-move-to="IN_PROGRESS" data-task-id="${esc(t.id)}">
-          In Progress →
-        </button>
-      `;
-    } else if (columnStatus === 'IN_PROGRESS') {
-      moveButtons = `
-        <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11.5px" data-move-to="TODO" data-task-id="${esc(t.id)}">
-          ← To Do
-        </button>
-        <button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:11.5px" data-move-to="COMPLETED" data-task-id="${esc(t.id)}">
-          Completed ✓
-        </button>
-      `;
-    } else if (columnStatus === 'COMPLETED') {
-      moveButtons = `
-        <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11.5px" data-move-to="IN_PROGRESS" data-task-id="${esc(t.id)}">
-          ← In Progress
-        </button>
-      `;
+    if (canCreateTask) {
+      if (columnStatus === 'TODO') {
+        moveButtons = `
+          <button class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:11.5px" data-move-to="IN_PROGRESS" data-task-id="${esc(t.id)}">
+            In Progress →
+          </button>
+        `;
+      } else if (columnStatus === 'IN_PROGRESS') {
+        moveButtons = `
+          <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11.5px" data-move-to="TODO" data-task-id="${esc(t.id)}">
+            ← To Do
+          </button>
+          <button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:11.5px" data-move-to="COMPLETED" data-task-id="${esc(t.id)}">
+            Completed ✓
+          </button>
+        `;
+      } else if (columnStatus === 'COMPLETED') {
+        moveButtons = `
+          <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11.5px" data-move-to="IN_PROGRESS" data-task-id="${esc(t.id)}">
+            ← In Progress
+          </button>
+        `;
+      }
     }
+
+    const actionDropdown = canCreateTask ? `
+      <div class="dropdown">
+        <button class="btn btn-sm btn-light py-0 px-1 text-muted" style="font-size:11px" data-bs-toggle="dropdown">⋮</button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size:13px">
+          <li><a class="dropdown-item" href="#" data-action="edit" data-task-id="${esc(t.id)}">Edit Task</a></li>
+          <li><a class="dropdown-item text-danger" href="#" data-action="delete" data-task-id="${esc(t.id)}">Delete Task</a></li>
+        </ul>
+      </div>
+    ` : '';
 
     return `
       <div class="kanban-card" data-card-id="${esc(t.id)}">
@@ -183,13 +196,7 @@ function renderColumn(containerId, tasks, columnStatus) {
           </div>
           <div class="d-flex gap-1 align-items-center">
             ${moveButtons}
-            <div class="dropdown">
-              <button class="btn btn-sm btn-light py-0 px-1 text-muted" style="font-size:11px" data-bs-toggle="dropdown">⋮</button>
-              <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size:13px">
-                <li><a class="dropdown-item" href="#" data-action="edit" data-task-id="${esc(t.id)}">Edit Task</a></li>
-                <li><a class="dropdown-item text-danger" href="#" data-action="delete" data-task-id="${esc(t.id)}">Delete Task</a></li>
-              </ul>
-            </div>
+            ${actionDropdown}
           </div>
         </div>
       </div>
@@ -243,6 +250,7 @@ async function deleteTask(taskId) {
 }
 
 function openCreateModal(defaultStatus = 'TODO') {
+  if (!canCreateTask) return;
   clearFormError('taskError');
   document.getElementById('taskForm').reset();
   document.getElementById('taskId').value = '';
@@ -254,6 +262,7 @@ function openCreateModal(defaultStatus = 'TODO') {
 }
 
 function openEditModal(taskId) {
+  if (!canCreateTask) return;
   const task = loadedTasks.find(t => t.id === taskId);
   if (!task) return;
   clearFormError('taskError');
@@ -341,7 +350,7 @@ async function init() {
   if (currentUser) {
     const rolesStr = (currentUser.roleNames || currentUser.roles || []).join(', ');
     document.getElementById('userChip').textContent = `${currentUser.fullName || 'User'}${rolesStr ? ` (${rolesStr})` : ''}`;
-    if ((currentUser.roles || []).some((r) => ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'].includes(r))) {
+    if ((currentUser.roles || []).some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'].includes(r))) {
       const navAdmin = document.getElementById('navAdmin');
       if (navAdmin) navAdmin.classList.remove('d-none');
     }
@@ -367,6 +376,30 @@ async function init() {
     if (project.mentor_name && !teamMembers.includes(project.mentor_name)) {
       teamMembers.push(project.mentor_name);
     }
+
+    const roles = currentUser?.roles || [];
+    const isGuide = roles.includes('FACULTY_MENTOR') && (
+      (project.mentor_user_id && project.mentor_user_id === currentUser.id) ||
+      (currentUser.fullName && project.mentor_name &&
+       project.mentor_name.trim().toLowerCase() === currentUser.fullName.trim().toLowerCase()) ||
+      (currentUser.fullName && project.faculty_mentor_name &&
+       project.faculty_mentor_name.trim().toLowerCase() === currentUser.fullName.trim().toLowerCase()) ||
+      (currentUser.projectIds || []).includes(project.id)
+    );
+    const isStudent = roles.includes('STUDENT') && (
+      (currentUser.projectIds || []).includes(project.id) ||
+      (currentUser.srn && (students || []).some(s => s.srn === currentUser.srn))
+    );
+    canCreateTask = Boolean(isGuide || isStudent);
+
+    const btnCreate = document.getElementById('btnCreateTask');
+    if (btnCreate) {
+      btnCreate.classList.toggle('d-none', !canCreateTask);
+    }
+    document.querySelectorAll('[data-add-to]').forEach((btn) => {
+      btn.classList.toggle('d-none', !canCreateTask);
+    });
+
     renderBreadcrumb();
     renderHeader(jiraLink);
     populateAssigneeSelect();

@@ -15,7 +15,7 @@ function getThemeId() {
 let themeId;
 let themeInfo;
 let addProjectModal;
-const ADMIN_ROLES = ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'];
+const ADMIN_ROLES = ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'];
 
 function currentFilters() {
   const params = new URLSearchParams();
@@ -147,7 +147,7 @@ async function init() {
     const { theme } = await Api.get(`/themes/${themeId}`);
     themeInfo = theme;
     document.getElementById('themeTitle').textContent = theme.name;
-    if (roles.includes('DEAN_PRINCIPAL')) {
+    if (roles.includes('DEAN_PRINCIPAL') || roles.includes('READ_ONLY_STAKEHOLDER') || roles.includes('REVIEWER')) {
       document.getElementById('breadcrumb').innerHTML =
         `<a href="dashboard.html">Departments</a> / <a href="department-dashboard.html?id=${esc(theme.department_id)}">${esc(theme.department_name)}</a> / ` +
         esc(theme.name);
@@ -177,13 +177,20 @@ async function init() {
     return;
   }
 
+  const hideStatus = roles.includes('READ_ONLY_STAKEHOLDER') || roles.includes('REVIEWER');
   const btnToggleStatus = document.getElementById('btnToggleStatus');
   const statusBarCard = document.getElementById('themeStatusBarCard');
-  if (btnToggleStatus && statusBarCard) {
+  const themeStatusFilterCol = document.getElementById('themeStatusFilterCol');
+
+  if (hideStatus) {
+    if (btnToggleStatus) btnToggleStatus.classList.add('d-none');
+    if (statusBarCard) statusBarCard.style.display = 'none';
+    if (themeStatusFilterCol) themeStatusFilterCol.classList.add('d-none');
+  } else if (btnToggleStatus && statusBarCard) {
     btnToggleStatus.addEventListener('click', () => {
       const isHidden = statusBarCard.style.display === 'none';
       statusBarCard.style.display = isHidden ? 'block' : 'none';
-      btnToggleStatus.textContent = isHidden ? '📊 Hide Status' : '📊 View Status';
+      btnToggleStatus.textContent = isHidden ? 'Hide Status' : 'View Status';
       if (isHidden) {
         btnToggleStatus.classList.remove('btn-outline-primary');
         btnToggleStatus.classList.add('btn-primary');

@@ -1,4 +1,4 @@
-const ADMIN_ROLES = ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'];
+const ADMIN_ROLES = ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'];
 let reportData = null;
 let weeklyMeta = 'Loading…';
 const mounted = {};

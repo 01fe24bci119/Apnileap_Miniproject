@@ -1,12 +1,12 @@
 const { logAudit } = require('../services/audit.service');
 
-// Role-based check. Platform Administrator is always allowed.
+// Role-based check. Platform Administrator and Global Programme Leader are always allowed.
 // Usage: requireRole('INSTITUTE_ADMIN', 'DEPARTMENT_HEAD')
 function requireRole(...allowedRoles) {
     return async (req, res, next) => {
         try {
             const roles = req.user?.roles || [];
-            const allowed = roles.includes('PLATFORM_ADMIN') || roles.some((r) => allowedRoles.includes(r));
+            const allowed = roles.some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER'].includes(r)) || roles.some((r) => allowedRoles.includes(r));
 
             if (!allowed) {
                 await logAudit({

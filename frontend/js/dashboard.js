@@ -21,12 +21,20 @@ function updateStats(projects) {
   if (elAvg) elAvg.textContent = `${avg}%`;
 }
 
-function renderProjects(projects, isFacultyOnly) {
+function renderProjects(projects, isFacultyOnly, isReadOnly = false) {
   const tbody = document.getElementById('projectsTableBody');
   updateStats(projects);
 
+  const thStatus = document.getElementById('thStatus');
+  if (thStatus) thStatus.classList.toggle('d-none', isReadOnly);
+
+  const statusFilterCol = document.getElementById('statusFilterCol');
+  if (statusFilterCol) statusFilterCol.classList.toggle('d-none', isReadOnly);
+
   if (!projects.length) {
-    const colSpan = isFacultyOnly ? 6 : 7;
+    let colSpan = 7;
+    if (isFacultyOnly) colSpan--;
+    if (isReadOnly) colSpan--;
     tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-muted text-center py-4">No projects found matching the criteria.</td></tr>`;
     return;
   }
@@ -41,6 +49,15 @@ function renderProjects(projects, isFacultyOnly) {
     const mentorCol = isFacultyOnly ? '' : `
       <td>
         <span class="fw-medium">${esc(p.mentor_name || 'Unassigned')}</span>
+      </td>
+    `;
+
+    const statusCol = isReadOnly ? '' : `
+      <td>
+        <span class="d-inline-flex align-items-center">
+          <span class="al-rag-dot ${ragClass} me-1"></span>
+          <span class="fw-semibold" style="font-size: 12px;">${rag}</span>
+        </span>
       </td>
     `;
 
@@ -59,12 +76,7 @@ function renderProjects(projects, isFacultyOnly) {
           <span style="font-size: 13px;">${esc(p.theme_name || '—')}</span>
         </td>
         ${mentorCol}
-        <td>
-          <span class="d-inline-flex align-items-center">
-            <span class="al-rag-dot ${ragClass} me-1"></span>
-            <span class="fw-semibold" style="font-size: 12px;">${rag}</span>
-          </span>
-        </td>
+        ${statusCol}
         <td>
           <div class="d-flex align-items-center gap-2" style="min-width: 100px;">
             <div class="progress flex-grow-1" style="height: 7px; background-color: #e2e8f0; border-radius: 4px;">
@@ -87,7 +99,7 @@ function renderProjects(projects, isFacultyOnly) {
   }).join('');
 }
 
-function applyFilters(isFacultyOnly) {
+function applyFilters(isFacultyOnly, isReadOnly = false) {
   const term = (document.getElementById('fSearch')?.value || '').toLowerCase().trim();
   const dept = document.getElementById('fDepartment')?.value || '';
   const mentor = document.getElementById('fMentor')?.value || '';
@@ -113,7 +125,7 @@ function applyFilters(isFacultyOnly) {
     return true;
   });
 
-  renderProjects(filtered, isFacultyOnly);
+  renderProjects(filtered, isFacultyOnly, isReadOnly);
 }
 
 function populateFilterOptions(projects, isFacultyOnly, isDean) {
@@ -181,24 +193,35 @@ async function loadProjectsDashboard(user, roleInfo) {
     allProjects = data.projects || [];
 
     populateFilterOptions(allProjects, roleInfo.isFacultyOnly, roleInfo.isDean);
-    renderProjects(allProjects, roleInfo.isFacultyOnly);
+    renderProjects(allProjects, roleInfo.isFacultyOnly, roleInfo.isReadOnly);
 
-    document.getElementById('fSearch')?.addEventListener('input', () => applyFilters(roleInfo.isFacultyOnly));
-    document.getElementById('fDepartment')?.addEventListener('change', () => applyFilters(roleInfo.isFacultyOnly));
-    document.getElementById('fMentor')?.addEventListener('change', () => applyFilters(roleInfo.isFacultyOnly));
-    document.getElementById('fTheme')?.addEventListener('change', () => applyFilters(roleInfo.isFacultyOnly));
-    document.getElementById('fStatus')?.addEventListener('change', () => applyFilters(roleInfo.isFacultyOnly));
+    document.getElementById('fSearch')?.addEventListener('input', () => applyFilters(roleInfo.isFacultyOnly, roleInfo.isReadOnly));
+    document.getElementById('fDepartment')?.addEventListener('change', () => applyFilters(roleInfo.isFacultyOnly, roleInfo.isReadOnly));
+    document.getElementById('fMentor')?.addEventListener('change', () => applyFilters(roleInfo.isFacultyOnly, roleInfo.isReadOnly));
+    document.getElementById('fTheme')?.addEventListener('change', () => applyFilters(roleInfo.isFacultyOnly, roleInfo.isReadOnly));
+    document.getElementById('fStatus')?.addEventListener('change', () => applyFilters(roleInfo.isFacultyOnly, roleInfo.isReadOnly));
   } catch (err) {
     document.getElementById('projectsTableBody').innerHTML =
       `<tr><td colspan="7" class="text-danger text-center py-4">Failed to load projects: ${esc(err.message)}</td></tr>`;
   }
 }
 
-async function loadDeanDepartments(user) {
+async function loadDeanDepartments(user, isReadOnly = false) {
   const pageTitle = document.getElementById('pageTitle');
   const pageSubtitle = document.getElementById('pageSubtitle');
-  pageTitle.textContent = 'Dean Department Portfolio';
-  pageSubtitle.textContent = `Select a department under your oversight to view themes and mini-projects (${user.fullName || 'KLE Technological University'})`;
+  pageTitle.textContent = isReadOnly ? 'Department Portfolio' : 'Dean Department Portfolio';
+  pageSubtitle.textContent = isReadOnly
+    ? `Select a department to view themes and mini-projects (${user.fullName || 'KLE Technological University (Hubballi Campus)'})`
+    : `Select a department under your oversight to view themes and mini-projects (${user.fullName || 'KLE Technological University (Hubballi Campus)'})`;
+
+  const deptChoiceTitle = document.getElementById('deptChoiceTitle');
+  if (deptChoiceTitle) deptChoiceTitle.textContent = 'Select Department';
+  const deptChoiceSubtitle = document.getElementById('deptChoiceSubtitle');
+  if (deptChoiceSubtitle) {
+    deptChoiceSubtitle.textContent = isReadOnly
+      ? 'Select a department to explore its project themes and mini-projects.'
+      : 'Select a department under your oversight to explore its project themes and mini-projects.';
+  }
 
   const grid = document.getElementById('deanDepartmentGrid');
   grid.innerHTML = '<div class="col-12 text-muted">Loading departments…</div>';
@@ -225,11 +248,11 @@ async function loadDeanDepartments(user) {
               <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
                 <div>
                   <span class="fs-4 fw-bold text-dark">${esc(d.project_count)}</span>
-                  <span class="text-muted" style="font-size: 13px;">${Number(d.project_count) === 1 ? 'Project' : 'Projects'}</span>
+                  <span class="text-muted" style="font-size: 12.5px;">${Number(d.project_count) === 1 ? 'Project' : 'Projects'}</span>
                 </div>
-                <div class="text-primary fw-medium" style="font-size: 13px;">
-                  View Themes &rarr;
-                </div>
+              </div>
+              <div class="mt-3 text-primary fw-medium text-end" style="font-size: 13px;">
+                View Themes &rarr;
               </div>
             </div>
           </div>
@@ -290,8 +313,10 @@ async function loadHodThemes(user) {
     const myDept = departments[0];
     pageTitle.textContent = `${myDept.name} — Themes`;
     pageSubtitle.textContent = `Department themes under your oversight (${user.fullName || 'Head of Department'})`;
-    document.getElementById('hodDeptTitle').textContent = `${myDept.name} Themes`;
-    document.getElementById('hodDeptSubtitle').textContent = `Select a theme to explore its mini-projects (${myDept.project_count} total projects).`;
+    const hodTitleEl = document.getElementById('hodDeptTitle');
+    if (hodTitleEl) hodTitleEl.textContent = `${myDept.name} Themes`;
+    const hodSubtitleEl = document.getElementById('hodDeptSubtitle');
+    if (hodSubtitleEl) hodSubtitleEl.textContent = `Select a theme to explore its mini-projects (${myDept.project_count} total projects).`;
 
     const { themes } = await Api.get(`/departments/${myDept.id}/themes`);
     if (!themes || !themes.length) {
@@ -334,7 +359,7 @@ async function init() {
   currentUser = JSON.parse(localStorage.getItem('al_user') || 'null');
   if (currentUser) {
     userChip.textContent = `${currentUser.fullName} · ${currentUser.roleNames?.[0] || currentUser.roles?.[0] || ''}`;
-    if ((currentUser.roles || []).some((r) => ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'].includes(r))) {
+    if ((currentUser.roles || []).some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'].includes(r))) {
       document.getElementById('navAdmin').classList.remove('d-none');
     }
   }
@@ -351,30 +376,45 @@ async function init() {
     !roles.some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN', 'DEAN_PRINCIPAL', 'DEPARTMENT_HEAD', 'REVIEWER'].includes(r));
   const isDean = roles.includes('DEAN_PRINCIPAL');
   const isHead = roles.includes('DEPARTMENT_HEAD');
-  const isAdmin = roles.some((r) => ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'].includes(r));
+  const isAdmin = roles.some((r) => ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'].includes(r));
+  const isReadOnly = roles.includes('READ_ONLY_STAKEHOLDER');
+  const isReviewer = roles.includes('REVIEWER');
+  const isDeptDrilldown = isDean || isReadOnly || isReviewer;
+  const hideStatus = isReadOnly || isReviewer;
 
-  const roleInfo = { isFacultyOnly, isDean, isHead, isAdmin };
+  const roleInfo = { isFacultyOnly, isDean, isHead, isAdmin, isReadOnly, isReviewer, isDeptDrilldown, hideStatus };
 
-  // Dean directly sees Department Choice Cards (Level 1)
-  if (roleInfo.isDean) {
+  // Dean, Read-only Stakeholders, and Reviewers see Department Choice Boxes directly (Depts -> Themes -> Projects)
+  if (roleInfo.isDeptDrilldown) {
     const deanView = document.getElementById('deanView');
     const projectsView = document.getElementById('projectsView');
 
     deanView.classList.remove('d-none');
     projectsView.classList.add('d-none');
 
-    await loadDeanDepartments(currentUser);
+    await loadDeanDepartments(currentUser, roleInfo.hideStatus);
   } else if (roleInfo.isHead) {
-    // HOD directly sees Department Themes (Level 1)
     const hodView = document.getElementById('hodView');
     const projectsView = document.getElementById('projectsView');
 
     hodView.classList.remove('d-none');
-    projectsView.classList.add('d-none');
+    projectsView.classList.add('d-none'); // Department themes come first!
 
     await loadHodThemes(currentUser);
+  } else if (roleInfo.isAdmin) {
+    const instituteCard = document.getElementById('instituteSummaryCard');
+    const projectsView = document.getElementById('projectsView');
+
+    instituteCard.classList.remove('d-none');
+    projectsView.classList.add('d-none');
+
+    const pageTitle = document.getElementById('pageTitle');
+    const pageSubtitle = document.getElementById('pageSubtitle');
+    pageTitle.textContent = 'Mini-Project Portfolio';
+    pageSubtitle.textContent = 'All projects under your administrative oversight';
+
+    await loadInstituteGrid();
   } else {
-    // Faculty Mentors, Admins directly see their Projects Portfolio
     await loadProjectsDashboard(currentUser, roleInfo);
   }
 }

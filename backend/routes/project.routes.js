@@ -76,7 +76,7 @@ router.get('/:projectId/reviews', listReviews);
 router.post('/:projectId/reviews', requireRole(...REVIEWER_UP), createReview);
 
 router.get('/:projectId/students', listStudents);
-router.put('/:projectId/students', requireRole(...MENTOR_UP), replaceStudents);
+router.put('/:projectId/students', requireRole(...PROJECT_UPDATE_ROLES), replaceStudents);
 
 router.get('/:projectId/links', listLinks);
 router.post('/:projectId/links', requireRole(...MENTOR_UP), addLink);

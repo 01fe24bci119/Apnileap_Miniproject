@@ -82,9 +82,28 @@ async function listWorkspaceTasks(req, res, next) {
     }
 }
 
+function canManageWorkspaceTask(user, project) {
+    if (!user || !project) return false;
+    const roles = user.roles || [];
+    const isGuide = roles.includes('FACULTY_MENTOR') && (
+        (project.mentor_user_id && project.mentor_user_id === user.id) ||
+        (user.fullName && project.mentor_name &&
+         project.mentor_name.trim().toLowerCase() === user.fullName.trim().toLowerCase()) ||
+        (user.fullName && project.faculty_mentor_name &&
+         project.faculty_mentor_name.trim().toLowerCase() === user.fullName.trim().toLowerCase()) ||
+        (user.projectIds || []).includes(project.id)
+    );
+    const isStudent = roles.includes('STUDENT') && (user.projectIds || []).includes(project.id);
+    return isGuide || isStudent;
+}
+
 // POST /api/projects/:projectId/workspace-tasks
 async function createWorkspaceTask(req, res, next) {
     try {
+        if (!canManageWorkspaceTask(req.user, req.project)) {
+            return res.status(403).json({ error: 'Only the assigned faculty guide and team students can create workspace tasks.' });
+        }
+
         const projectId = req.params.projectId;
         const { title, description, status, priority, assigneeName, jiraIssueKey } = req.body || {};
 
@@ -116,6 +135,10 @@ async function createWorkspaceTask(req, res, next) {
 // PUT /api/projects/:projectId/workspace-tasks/:taskId
 async function updateWorkspaceTask(req, res, next) {
     try {
+        if (!canManageWorkspaceTask(req.user, req.project)) {
+            return res.status(403).json({ error: 'Only the assigned faculty guide and team students can update workspace tasks.' });
+        }
+
         const { projectId, taskId } = req.params;
         const { title, description, status, priority, assigneeName } = req.body || {};
 
@@ -154,6 +177,10 @@ async function updateWorkspaceTask(req, res, next) {
 // DELETE /api/projects/:projectId/workspace-tasks/:taskId
 async function deleteWorkspaceTask(req, res, next) {
     try {
+        if (!canManageWorkspaceTask(req.user, req.project)) {
+            return res.status(403).json({ error: 'Only the assigned faculty guide and team students can delete workspace tasks.' });
+        }
+
         const { projectId, taskId } = req.params;
         const { rowCount } = await pool.query(
             `DELETE FROM workspace_tasks WHERE id = $1 AND project_id = $2`,

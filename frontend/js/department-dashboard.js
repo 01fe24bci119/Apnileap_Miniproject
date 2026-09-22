@@ -5,7 +5,7 @@ function getDepartmentId() {
 let departmentId;
 let departmentInfo;
 let addThemeModal;
-const ADMIN_ROLES = ['PLATFORM_ADMIN', 'INSTITUTE_ADMIN'];
+const ADMIN_ROLES = ['PLATFORM_ADMIN', 'GLOBAL_PROGRAMME_LEADER', 'INSTITUTE_ADMIN'];
 const MENTOR_UP_ROLES = ['PLATFORM_ADMIN', 'FACULTY_MENTOR', 'DEPARTMENT_HEAD', 'INSTITUTE_ADMIN', 'DEAN_PRINCIPAL', 'GLOBAL_PROGRAMME_LEADER'];
 
 async function loadThemes() {
@@ -85,7 +85,7 @@ async function init() {
     const { department } = await Api.get(`/departments/${departmentId}`);
     departmentInfo = department;
     document.getElementById('departmentTitle').textContent = department.name;
-    if (roles.includes('DEAN_PRINCIPAL')) {
+    if (roles.includes('DEAN_PRINCIPAL') || roles.includes('READ_ONLY_STAKEHOLDER') || roles.includes('REVIEWER')) {
       document.getElementById('breadcrumb').innerHTML =
         `<a href="dashboard.html">Departments</a> / ${esc(department.name)}`;
     } else {

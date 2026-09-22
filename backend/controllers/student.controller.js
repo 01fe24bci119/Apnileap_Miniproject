@@ -27,6 +27,21 @@ async function listStudents(req, res, next) {
 
 // PUT /api/projects/:projectId/students - replaces the whole team (always four)
 async function replaceStudents(req, res, next) {
+    const roles = req.user?.roles || [];
+    const isPlatformAdmin = roles.includes('PLATFORM_ADMIN');
+    const isHod = roles.includes('DEPARTMENT_HEAD') && (req.user.departmentIds || []).includes(req.project.department_id);
+    const isGuide = roles.includes('FACULTY_MENTOR') && (
+        (req.project.mentor_user_id && req.project.mentor_user_id === req.user.id) ||
+        (req.user.fullName && req.project.faculty_mentor_name &&
+         req.project.faculty_mentor_name.trim().toLowerCase() === req.user.fullName.trim().toLowerCase()) ||
+        (req.user.projectIds || []).includes(req.project.id)
+    );
+    const isStudent = roles.includes('STUDENT') && (req.user.projectIds || []).includes(req.project.id);
+
+    if (!isPlatformAdmin && !isHod && !isGuide && !isStudent) {
+        return res.status(403).json({ error: 'Only the faculty guide, project team students, HOD, or Platform Administrator can edit team details.' });
+    }
+
     const client = await pool.connect();
     try {
         const result = validateTeam(req.body?.students);
