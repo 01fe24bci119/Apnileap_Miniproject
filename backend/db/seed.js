@@ -204,6 +204,7 @@ async function seed() {
         ];
         const themeMap = {};
         for (const deptKey of Object.keys(departmentIds)) {
+            if (deptKey === 'KLE:CSEAI') continue; // Handled separately with real department themes below
             const deptId = departmentIds[deptKey];
             for (const tName of sampleThemeNames) {
                 const { rows: tRows } = await client.query(
@@ -251,59 +252,169 @@ async function seed() {
                              '2026-27', 'Sem-5', rag, completion, assignedThemeId, assignedThemeName]
                         );
 
-                    // Only for newly created rows, so re-running the seed does not
-                    // pile up duplicate history entries.
-                    if (rows[0].inserted) {
-                        await client.query(
-                            `INSERT INTO status_history (project_id, previous_status, new_status, reason, changed_by)
-                             VALUES ($1, NULL, $2, 'Initial status at project creation', $3)`,
-                            [rows[0].id, rag, mentorId]
-                        );
+                        // Only for newly created rows, so re-running the seed does not
+                        // pile up duplicate history entries.
+                        if (rows[0].inserted) {
+                            await client.query(
+                                `INSERT INTO status_history (project_id, previous_status, new_status, reason, changed_by)
+                                 VALUES ($1, NULL, $2, 'Initial status at project creation', $3)`,
+                                [rows[0].id, rag, mentorId]
+                            );
+                        }
                     }
                 }
             }
         }
-    }
         console.log('Sample projects seeded:', projectSeq - 1);
 
-        // KLE's second CSE department: two demo projects, only if it has none.
-        // The next code continues KLE's numbering so nothing already there is
-        // overwritten.
+        // KLE CSEAI: Seed real student teams, themes, and faculty guides
         const cseaiId = departmentIds['KLE:CSEAI'];
-        const { rows: cseaiProjects } = await client.query(`SELECT 1 FROM projects WHERE department_id = $1 LIMIT 1`, [cseaiId]);
-        if (!cseaiProjects.length) {
-            const { rows: maxRows } = await client.query(
-                `SELECT COALESCE(MAX(NULLIF(regexp_replace(project_code, '^.*-', ''), '')::int), 0) AS max_seq
-                 FROM projects WHERE project_code LIKE 'AL-KLE-%'`
-            );
-            let seq = Number(maxRows[0].max_seq);
-            for (const [i, rag] of ['GREEN', 'YELLOW'].entries()) {
-                seq++;
-                const assignedThemeName = sampleThemeNames[i % sampleThemeNames.length];
-                const assignedThemeId = themeMap[`${cseaiId}:${assignedThemeName}`];
+        const cseaiDataPath = path.join(__dirname, 'data', 'cseai_teams.json');
+        if (require('fs').existsSync(cseaiDataPath)) {
+            const cseaiTeams = JSON.parse(require('fs').readFileSync(cseaiDataPath, 'utf8'));
+            console.log(`Loading ${cseaiTeams.length} real CSEAI teams from cseai_teams.json...`);
+
+            // 1. Seed CSEAI themes
+            const uniqueThemes = [...new Set(cseaiTeams.map((t) => t.theme).filter(Boolean))];
+            for (const tName of uniqueThemes) {
                 const { rows } = await client.query(
-                    `INSERT INTO projects
-                        (project_code, title, institute_id, department_id, mentor_user_id, academic_year, semester,
-                         rag_status, completion_pct, last_review_at, next_review_at, project_phase, created_by, theme_id, theme_name)
-                     VALUES ($1,$2,$3,$4,$5,'2026-27','Sem-5',$6,$7, now() - interval '10 days', now() + interval '7 days','ACTIVE',$5,$8,$9)
+                    `INSERT INTO themes (department_id, name, description)
+                     VALUES ($1, $2, $3)
+                     ON CONFLICT (department_id, name) DO UPDATE SET name = EXCLUDED.name
+                     RETURNING id, name`,
+                    [cseaiId, tName, `Mini-project innovations focused on ${tName}`]
+                );
+                themeMap[`${cseaiId}:${tName}`] = rows[0].id;
+            }
+
+            // Remove any legacy empty themes for CSEAI
+            await client.query(
+                `DELETE FROM themes WHERE department_id = $1 AND NOT (name = ANY($2::text[]))`,
+                [cseaiId, uniqueThemes]
+            );
+
+            // 2. Seed CSEAI Faculty Guides / Mentors
+            const guideEmailHelper = (name) => {
+                const parts = name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().split(/\s+/);
+                if (parts.length === 1) return `${parts[0]}@apnileap.org`;
+                return `${parts[0]}.${parts[parts.length - 1]}@apnileap.org`;
+            };
+
+            const cseaiMentorMap = {};
+            const { rows: existingMentors } = await client.query(
+                `SELECT u.id, u.full_name, u.email FROM users u 
+                 JOIN user_roles ur ON u.id = ur.user_id 
+                 WHERE ur.role_id = $1`,
+                [roleIds['FACULTY_MENTOR']]
+            );
+            existingMentors.forEach((m) => {
+                cseaiMentorMap[m.full_name.trim().toLowerCase()] = m.id;
+            });
+
+            const uniqueGuides = [...new Set(cseaiTeams.map((t) => t.guideClean).filter(Boolean))];
+            for (const gName of uniqueGuides) {
+                const key = gName.toLowerCase();
+                const foundKey = Object.keys(cseaiMentorMap).find((k) => k.includes(key) || key.includes(k));
+                if (foundKey) {
+                    cseaiMentorMap[key] = cseaiMentorMap[foundKey];
+                    continue;
+                }
+
+                const gEmail = guideEmailHelper(gName);
+                const { rows: uRows } = await client.query(
+                    `INSERT INTO users (email, password_hash, full_name)
+                     VALUES ($1, $2, $3)
+                     ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name
                      RETURNING id`,
-                    [`AL-KLE-${String(seq).padStart(3, '0')}`, `Computer Science and Engineering (AI) Mini Project ${i + 1}`,
-                     instituteIds.KLE, cseaiId, mentorId, rag, rag === 'YELLOW' ? 55 : 78, assignedThemeId, assignedThemeName]
+                    [gEmail, passwordHash, gName]
+                );
+                const mentorUserId = uRows[0].id;
+                cseaiMentorMap[key] = mentorUserId;
+
+                await client.query(
+                    `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                    [mentorUserId, roleIds['FACULTY_MENTOR']]
                 );
                 await client.query(
-                    `INSERT INTO status_history (project_id, previous_status, new_status, reason, changed_by)
-                     VALUES ($1, NULL, $2, 'Initial status at project creation', $3)`,
-                    [rows[0].id, rag, mentorId]
+                    `INSERT INTO user_institute_access (user_id, institute_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                    [mentorUserId, instituteIds.KLE]
+                );
+                await client.query(
+                    `INSERT INTO user_department_access (user_id, department_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                    [mentorUserId, cseaiId]
                 );
             }
-        } else {
-            // Ensure CSEAI projects also have theme_id and theme_name populated
-            const { rows: existingCseai } = await client.query(`SELECT id FROM projects WHERE department_id = $1 ORDER BY project_code`, [cseaiId]);
-            for (const [i, p] of existingCseai.entries()) {
-                const assignedThemeName = sampleThemeNames[i % sampleThemeNames.length];
-                const assignedThemeId = themeMap[`${cseaiId}:${assignedThemeName}`];
-                await client.query(`UPDATE projects SET theme_id = $1, theme_name = $2 WHERE id = $3`, [assignedThemeId, assignedThemeName, p.id]);
+
+            // Sync sequences to avoid collisions
+            await client.query(`SELECT setval('artefact_id_seq', 200, true)`);
+            await client.query(`SELECT setval('team_id_seq', 200, true)`);
+
+            // Clear existing students in CSEAI before re-inserting to prevent unique constraint collisions
+            await client.query(`DELETE FROM project_students WHERE project_id IN (SELECT id FROM projects WHERE department_id = $1)`, [cseaiId]);
+
+            // 3. Seed Projects & Students
+            const specialCodeMap = {
+                'B14': 'AL-KLE-023',
+                'B13': 'AL-KLE-024',
+                'B11': 'AL-KLE-025',
+                'A1': 'AL-KLE-003',
+                'A2': 'AL-KLE-004',
+            };
+            let nextSeq = 26;
+
+            for (const team of cseaiTeams) {
+                let projectCode = specialCodeMap[team.teamNo];
+                if (!projectCode) {
+                    projectCode = `AL-KLE-${String(nextSeq).padStart(3, '0')}`;
+                    nextSeq++;
+                }
+
+                const mentorIdVal = cseaiMentorMap[team.guideClean.toLowerCase()] || null;
+                const themeIdVal = themeMap[`${cseaiId}:${team.theme}`] || null;
+                const rag = RAG_CYCLE[ragIdx % RAG_CYCLE.length];
+                ragIdx++;
+                const compPct = rag === 'RED' ? 35 : (rag === 'YELLOW' ? 60 : 82);
+
+                const { rows: existingProj } = await client.query(
+                    `SELECT id FROM projects WHERE project_code = $1`,
+                    [projectCode]
+                );
+
+                let projectId;
+                if (existingProj.length) {
+                    projectId = existingProj[0].id;
+                    await client.query(
+                        `UPDATE projects
+                         SET title = $1, theme_id = $2, theme_name = $3, mentor_user_id = $4, faculty_mentor_name = $5,
+                             team_id = $6, artefact_title = $1, department_id = $7, institute_id = $8, is_active = TRUE,
+                             rag_status = COALESCE(rag_status, $9), completion_pct = COALESCE(completion_pct, $10)
+                         WHERE id = $11`,
+                        [team.title, themeIdVal, team.theme, mentorIdVal, team.guideClean, team.teamNo, cseaiId, instituteIds.KLE, rag, compPct, projectId]
+                    );
+                } else {
+                    const { rows: newProj } = await client.query(
+                        `INSERT INTO projects (
+                             project_code, title, institute_id, department_id, mentor_user_id, faculty_mentor_name,
+                             academic_year, semester, rag_status, completion_pct, project_phase, is_active,
+                             theme_id, theme_name, team_id, artefact_title, last_review_at, next_review_at
+                         ) VALUES (
+                             $1, $2, $3, $4, $5, $6, '2026-27', 'Sem-5', $7, $8, 'ACTIVE', TRUE,
+                             $9, $10, $11, $2, now() - interval '10 days', now() + interval '7 days'
+                         ) RETURNING id`,
+                        [projectCode, team.title, instituteIds.KLE, cseaiId, mentorIdVal, team.guideClean, rag, compPct, themeIdVal, team.theme, team.teamNo]
+                    );
+                    projectId = newProj[0].id;
+                }
+
+                for (const s of team.students) {
+                    await client.query(
+                        `INSERT INTO project_students (project_id, slot, name, srn, semester, division)
+                         VALUES ($1, $2, $3, $4, $5, $6)`,
+                        [projectId, s.slot, s.name, s.srn, s.semester, s.division]
+                    );
+                }
             }
+            console.log(`Seeded ${cseaiTeams.length} real CSEAI teams and student rosters.`);
         }
 
         // Every project has exactly four students: give any project without a
@@ -314,11 +425,21 @@ async function seed() {
              ORDER BY p.project_code`
         );
         let teamSeed = 0;
+        const { rows: maxSrnRows } = await client.query(
+            `SELECT COALESCE(MAX(NULLIF(regexp_replace(srn, '^01FE23BCS', ''), '')::int), 99) AS max_srn
+             FROM project_students WHERE srn LIKE '01FE23BCS%'`
+        );
+        const maxSrnVal = Number(maxSrnRows[0].max_srn);
+        if (maxSrnVal >= 100) {
+            teamSeed = Math.floor((maxSrnVal - 100) / 4) + 1;
+        }
+
         for (const { id } of teamless) {
             for (const s of demoTeam(teamSeed)) {
                 await client.query(
                     `INSERT INTO project_students (project_id, slot, name, srn, semester, division)
-                     VALUES ($1,$2,$3,$4,$5,$6)`,
+                     VALUES ($1,$2,$3,$4,$5,$6)
+                     ON CONFLICT DO NOTHING`,
                     [id, s.slot, s.name, s.srn, s.semester, s.division]
                 );
             }
